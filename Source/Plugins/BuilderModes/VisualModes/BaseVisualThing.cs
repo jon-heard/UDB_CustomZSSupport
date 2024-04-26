@@ -77,11 +77,22 @@ namespace CodeImp.DoomBuilder.BuilderModes
 			nointeraction = (info.Actor != null && info.Actor.GetFlagValue("nointeraction", false));
 
 			//mxd. Find sprite textures
-			sprites = new ImageData[info.SpriteFrame.Length];
-			for(int i = 0; i < info.SpriteFrame.Length; i++)
+			if (!Thing.Fields.ContainsKey("user_sprite") ||
+			    Thing.Fields["user_sprite"].Type != 2 ||
+			    ((string)Thing.Fields["user_sprite"].Value).Length == 0)
 			{
-				sprites[i] = General.Map.Data.GetSpriteImage(info.SpriteFrame[i].Sprite);
+				sprites = new ImageData[info.SpriteFrame.Length];
+				for (int i = 0; i < info.SpriteFrame.Length; i++)
+				{
+					sprites[i] = General.Map.Data.GetSpriteImage(info.SpriteFrame[i].Sprite);
+				}
 			}
+			else
+			{
+				sprites = new ImageData[1];
+				sprites[0] = General.Map.Data.GetSpriteImage((string)Thing.Fields["user_sprite"].Value + "A0");
+			}
+
 
 			//mxd
 			if(mode.UseSelectionFromClassicMode && t.Selected)
@@ -333,10 +344,18 @@ namespace CodeImp.DoomBuilder.BuilderModes
 
 					// Scale by thing type/actor scale
 					// We do this after the offset x/y determination above, because that is entirely in sprite pixels space
-					radius *= info.SpriteScale.Width;
-					height *= info.SpriteScale.Height;
-					offsets.x *= info.SpriteScale.Width;
-					offsets.y *= info.SpriteScale.Height;
+					float sw = info.SpriteScale.Width;
+					float sh = info.SpriteScale.Height;
+					if (Thing.Fields.ContainsKey("user_scale") &&
+					    Thing.Fields["user_scale"].Type == 1 &&
+					    (double)Thing.Fields["user_scale"].Value != 0)
+					{
+						sw = sh = (float)((double)Thing.Fields["user_scale"].Value);
+					}
+					radius *= sw;
+					height *= sh;
+					offsets.x *= sw;
+					offsets.y *= sh;
 
 					// Make vertices
 					WorldVertex[] verts = new WorldVertex[6];
@@ -428,7 +447,14 @@ namespace CodeImp.DoomBuilder.BuilderModes
 				if(Thing.Sector != null)
 				{
 					SectorData sd = mode.GetSectorData(Thing.Sector);
-					double maxz = sd.Ceiling.plane.GetZ(Thing.Position) - info.Height;
+					float height = info.Height;
+					if (Thing.Fields.ContainsKey("user_height") &&
+						Thing.Fields["user_height"].Type == 1 &&
+						(double)Thing.Fields["user_height"].Value != 0)
+					{
+						height = (float)((double)Thing.Fields["user_height"].Value);
+					}
+					double maxz = sd.Ceiling.plane.GetZ(Thing.Position) - height;
 					pos.z = maxz;
 
 					if(Thing.Position.z > 0 || nointeraction) pos.z -= Thing.Position.z;
@@ -455,7 +481,14 @@ namespace CodeImp.DoomBuilder.BuilderModes
 					// Check if above ceiling
 					if(!nointeraction)
 					{
-						double maxz = sd.Ceiling.plane.GetZ(Thing.Position) - info.Height;
+						float height = info.Height;
+						if (Thing.Fields.ContainsKey("user_height") &&
+							Thing.Fields["user_height"].Type == 1 &&
+							(double)Thing.Fields["user_height"].Value != 0)
+						{
+							height = (float)((double)Thing.Fields["user_height"].Value);
+						}
+						double maxz = sd.Ceiling.plane.GetZ(Thing.Position) - height;
 						if(pos.z > maxz) pos.z = Math.Max(minz, maxz);
 					}
 				}
@@ -511,10 +544,20 @@ namespace CodeImp.DoomBuilder.BuilderModes
 			nointeraction = (info.Actor != null && info.Actor.GetFlagValue("nointeraction", false));
 
 			//mxd. Find sprite textures
-			sprites = new ImageData[info.SpriteFrame.Length];
-			for(int i = 0; i < info.SpriteFrame.Length; i++)
+			if (!Thing.Fields.ContainsKey("user_sprite") ||
+				Thing.Fields["user_sprite"].Type != 2 ||
+				((string)Thing.Fields["user_sprite"].Value).Length == 0)
 			{
-				sprites[i] = General.Map.Data.GetSpriteImage(info.SpriteFrame[i].Sprite);
+				sprites = new ImageData[info.SpriteFrame.Length];
+				for (int i = 0; i < info.SpriteFrame.Length; i++)
+				{
+					sprites[i] = General.Map.Data.GetSpriteImage(info.SpriteFrame[i].Sprite);
+				}
+			}
+			else
+			{
+				sprites = new ImageData[1];
+				sprites[0] = General.Map.Data.GetSpriteImage((string)Thing.Fields["user_sprite"].Value + "A0");
 			}
 			
 			// Setup visual thing

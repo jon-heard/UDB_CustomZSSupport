@@ -1297,32 +1297,53 @@ namespace CodeImp.DoomBuilder.Rendering
 				Dictionary<int, List<Thing>> thingsByType = new Dictionary<int, List<Thing>>();
 				Dictionary<int, List<Thing>> modelsByType = new Dictionary<int, List<Thing>>();
 				Dictionary<Thing, Vector3D> thingsByPosition = new Dictionary<Thing, Vector3D>();
+				List<Tuple<int, string>> userSpritedThingGroups = new List<Tuple<int, string>>();
+				userSpritedThingGroups.Add(null); // Fill 0, so all indices will be negative when multiplied by -1
+				Dictionary<Tuple<int, string>, int> userSpritedThingTypeToIndex = new Dictionary<Tuple<int, string>, int>();
 
 				// Go for all things
 				int buffercount = 0;
 				int totalcount = 0;
-				foreach(Thing t in things)
+				foreach (Thing t in things)
 				{
 					//mxd. Highlighted thing should be rendered separately
-					if(!fixedcolor && t.Highlighted) continue;
-					
+					if (!fixedcolor && t.Highlighted) continue;
+
 					// Collect models
-					if(t.RenderMode == ThingRenderMode.MODEL || t.RenderMode == ThingRenderMode.VOXEL) 
+					if (t.RenderMode == ThingRenderMode.MODEL || t.RenderMode == ThingRenderMode.VOXEL)
 					{
-						if(!modelsByType.ContainsKey(t.Type)) modelsByType.Add(t.Type, new List<Thing>());
+						if (!modelsByType.ContainsKey(t.Type)) modelsByType.Add(t.Type, new List<Thing>());
 						modelsByType[t.Type].Add(t);
 					}
-					
+
 					// Create vertices
 					PixelColor tc = fixedcolor ? c : DetermineThingColor(t);
 					byte bboxalpha = (byte)(alpha * ((!fixedcolor && !t.Selected && isthingsmode) ? 128 : 255));
-					if(CreateThingBoxVerts(t, ref verts, ref bboxes, thingsByPosition, buffercount * 6, tc, bboxalpha))
+					if (CreateThingBoxVerts(t, ref verts, ref bboxes, thingsByPosition, buffercount * 6, tc, bboxalpha))
 					{
 						buffercount++;
 
-						//mxd
-						if(!thingsByType.ContainsKey(t.Type)) thingsByType.Add(t.Type, new List<Thing>());
-						thingsByType[t.Type].Add(t);
+						if (!t.Fields.ContainsKey("user_sprite") || // There's a "user_sprite" field
+							t.Fields["user_sprite"].Type != 2 || // user_sprite has a string type
+						    ((string)t.Fields["user_sprite"].Value).Length == 0) // user_sprite has a length over 0
+						{
+							//mxd
+							if (!thingsByType.ContainsKey(t.Type)) thingsByType.Add(t.Type, new List<Thing>());
+							thingsByType[t.Type].Add(t);
+						}
+						else
+						{
+							Tuple<int, string> userSpritedThingType = new Tuple<int, string>(t.Type, t.Fields["user_sprite"].Value as string);
+							if (!userSpritedThingTypeToIndex.ContainsKey(userSpritedThingType))
+							{
+								userSpritedThingTypeToIndex.Add(userSpritedThingType, userSpritedThingGroups.Count);
+								userSpritedThingGroups.Add(userSpritedThingType);
+							}
+							//mxd
+							int typeIndex = userSpritedThingTypeToIndex[userSpritedThingType];
+							if (!thingsByType.ContainsKey(-typeIndex)) thingsByType.Add(-typeIndex, new List<Thing>());
+							thingsByType[-typeIndex].Add(t);
+						}
 					}
 					
 					totalcount++;
@@ -1358,16 +1379,21 @@ namespace CodeImp.DoomBuilder.Rendering
 					// Skip when all things of this type will be rendered as models
 					if((group.Value[0].RenderMode == ThingRenderMode.MODEL || group.Value[0].RenderMode == ThingRenderMode.VOXEL)
 						&& (General.Settings.GZDrawModelsMode == ModelRenderMode.ALL)) continue;
-					
+
 					// Find thing information
-					ThingTypeInfo info = General.Map.Data.GetThingInfo(group.Key);
+					int thingTypeId = group.Key;
+					if (thingTypeId < 0)
+					{
+						thingTypeId = userSpritedThingGroups[-thingTypeId].Item1;
+					}
+					ThingTypeInfo info = General.Map.Data.GetThingInfo(thingTypeId);
 
 					// Find sprite texture
-					if(info.Sprite.Length == 0) continue;
+					if (group.Key >= 0 && info.Sprite.Length == 0) continue;
 
 					// Sort by sprite angle...
 					Dictionary<int, List<Thing>> thingsbyangle = new Dictionary<int, List<Thing>>(group.Value.Count);
-					if(info.SpriteFrame.Length == 8)
+					if(group.Key >= 0 && info.SpriteFrame.Length == 8)
 					{
 						foreach(Thing t in group.Value)
 						{
@@ -1386,8 +1412,20 @@ namespace CodeImp.DoomBuilder.Rendering
 
 					foreach(KeyValuePair<int, List<Thing>> framegroup in thingsbyangle)
 					{
-						SpriteFrameInfo sfi = info.SpriteFrame[framegroup.Key];
-						ImageData sprite = General.Map.Data.GetSpriteImage(sfi.Sprite);
+						string spriteId;
+						bool spriteIsMirrored;
+						if (group.Key >= 0)
+						{
+							SpriteFrameInfo sfi = info.SpriteFrame[framegroup.Key];
+							spriteId = sfi.Sprite;
+							spriteIsMirrored = sfi.Mirror;
+						}
+						else
+						{
+							spriteId = userSpritedThingGroups[-group.Key].Item2 + "A0";
+							spriteIsMirrored = false;
+						}
+						ImageData sprite = General.Map.Data.GetSpriteImage(spriteId);
 						if(sprite == null) continue;
 
 						graphics.SetTexture(sprite.Texture);
@@ -1456,7 +1494,7 @@ namespace CodeImp.DoomBuilder.Rendering
 								continue;
 							}
 
-							CreateThingSpriteVerts(thingsByPosition[t], spritewidth, spriteheight, ref verts, buffercount * 6, (t.Selected ? selectionColor : 0xFFFFFF), sfi.Mirror);
+							CreateThingSpriteVerts(thingsByPosition[t], spritewidth, spriteheight, ref verts, buffercount * 6, (t.Selected ? selectionColor : 0xFFFFFF), spriteIsMirrored);
 							buffercount++;
 							totalcount++;
 

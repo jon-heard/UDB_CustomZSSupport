@@ -563,7 +563,7 @@ namespace CodeImp.DoomBuilder.Map
 
 			UpdateCache(); //mxd
 		}
-		
+
 		// This updates the settings from configuration
 		public void UpdateConfiguration()
 		{
@@ -590,9 +590,19 @@ namespace CodeImp.DoomBuilder.Map
 				else if(ti.Args[i].Type == (int)UniversalType.ThingHeight && args[i] > 0)
 					height = args[i];
 			}
-			
+
+			// If there are user variables for height or radius, set this thing's size to them
+			if (Fields.ContainsKey("user_height") && Fields["user_height"].Type == 1 && ((double)Fields["user_height"].Value) != 0)
+			{
+				height = (float)((double)Fields["user_height"].Value);
+			}
+			if (Fields.ContainsKey("user_radius") && Fields["user_radius"].Type == 1 && ((double)Fields["user_radius"].Value) != 0)
+			{
+				size = (float)((double)Fields["user_radius"].Value);
+			}
+
 			// Color valid?
-			if((ti.Color >= 0) && (ti.Color < ColorCollection.NUM_THING_COLORS))
+			if ((ti.Color >= 0) && (ti.Color < ColorCollection.NUM_THING_COLORS))
 			{
 				// Apply color
 				color = General.Colors.Colors[ti.Color + ColorCollection.THING_COLORS_OFFSET];
